@@ -9,12 +9,12 @@ export type ModMetadata = {
 export type ModData<Alias extends string, ImmutableResources extends object | undefined, State extends object> = {
     readonly alias: Alias;
     readonly resources?: ImmutableResources;
-    state?: (engineCore: InitializedEngineCore, metadata: ModMetadata) => State;
+    state?: (metadata: ModMetadata, engineCore: InitializedEngineCore) => State;
 };
 export type GenericModData = {
     readonly alias: string;
     readonly resources?: object;
-    state?: (engineCore: InitializedEngineCore, metadata: ModMetadata) => object;
+    state?: (metadata: ModMetadata, engineCore: InitializedEngineCore) => object;
 };
 export type DependentMods = ReadonlyArray<GenericModData>;
 export type DependenciesDeclaration<Dependencies extends DependentMods> = Dependencies extends [] ? {} : {
@@ -51,7 +51,7 @@ export type EngineLinkedMods<EngineModules extends DependentMods> = {
 export type ShaheenEngine<Dependencies extends DependentMods = []> = (EngineLinkedMods<Dependencies> & InitializedEngineCore);
 export type EnginePrimitives = Partial<PostInitializationCore>;
 export type ModLifeCycleEvents<Dependencies extends DependentMods, Alias extends string, ImmutableResources extends object | undefined, State extends object> = {
-    onInit?: (engineCore: ExtendedEngineCore, metadata: ModMetadata) => Promise<EnginePrimitives | void> | EnginePrimitives | void;
+    onInit?: (metadata: ModMetadata, engineCore: ExtendedEngineCore) => Promise<EnginePrimitives | void> | EnginePrimitives | void;
     onBeforeGameLoop?: (engine: ShaheenEngine<[
         ...Dependencies,
         ModData<Alias, ImmutableResources, State>

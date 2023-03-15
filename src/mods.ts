@@ -22,15 +22,18 @@ export type ModData<
 > = {
     readonly alias: Alias,
     readonly resources?: ImmutableResources
-    state?: (engineCore: InitializedEngineCore, metadata: ModMetadata) => State
+    state?: (
+        metadata: ModMetadata,
+        engineCore: InitializedEngineCore, 
+    ) => State
 }
 
 export type GenericModData = {
     readonly alias: string,
     readonly resources?: object
     state?: (
-        engineCore: InitializedEngineCore,
-        metadata: ModMetadata, 
+        metadata: ModMetadata,
+        engineCore: InitializedEngineCore, 
     ) => object
 }
 
@@ -126,8 +129,8 @@ export type ModLifeCycleEvents<
     State extends object
 > = {
     onInit?: (
+        metadata: ModMetadata,
         engineCore: ExtendedEngineCore, 
-        metadata: ModMetadata
     ) => Promise<EnginePrimitives | void> | EnginePrimitives | void,
     
     onBeforeGameLoop?: (
