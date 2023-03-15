@@ -13,6 +13,7 @@ export default defineConfig({
                 "./src/permissions.ts",
                 "./src/huzem.ts",
                 "./src/extensions.ts",
+                "./src/engine.ts",
             ],
             formats: ["es"]
         }
