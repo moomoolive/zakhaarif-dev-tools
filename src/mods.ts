@@ -15,6 +15,11 @@ export type ModMetadata = {
     resolvedUrl: string
 }
 
+export type StateEvent<State extends object> = (
+    metadata: ModMetadata,
+    engineCore: InitializedEngineCore, 
+) => State
+
 export type ModData<
     Alias extends string,
     ImmutableResources extends object | undefined,
@@ -22,73 +27,36 @@ export type ModData<
 > = {
     readonly alias: Alias,
     readonly resources?: ImmutableResources
-    state?: (
-        metadata: ModMetadata,
-        engineCore: InitializedEngineCore, 
-    ) => State
+    state?: StateEvent<State>
 }
 
-export type GenericModData = {
-    readonly alias: string,
-    readonly resources?: object
-    state?: (
-        metadata: ModMetadata,
-        engineCore: InitializedEngineCore, 
-    ) => object
-}
+export type GenericModData = ModData<string, object | undefined, object>
 
-export type DependentMods = ReadonlyArray<GenericModData>
-
-export type DependenciesDeclaration<
-    Dependencies extends DependentMods
-> = Dependencies extends [] ? {} : {
-    // generics here made with the help of these answers:
-    // https://stackoverflow.com/questions/71918556/typescript-creating-object-type-from-readonly-array
-    // https://stackoverflow.com/questions/71931020/creating-a-readonly-array-from-another-readonly-array
-    
-    readonly dependencies: {
-        [index in keyof Dependencies]: Dependencies[index] extends { alias: string }
-            ? Dependencies[index]["alias"]
-            : never
-    }
-}
-
-export type ModWrapperCore = (
-    ModMetadata
-    & {
-        dependencies: string[]
-        originalModule: GenericModModule
-    }
-)
+export type ModModules = ReadonlyArray<GenericModData>
 
 export type ModWrapper<
     Alias extends string,
     ImmutableResources extends object | undefined,
     State extends object
 > = (
-    ModWrapperCore
+    ModMetadata
     & {
         readonly alias: Alias
         readonly resources: ImmutableResources extends undefined
             ? {}
             : ImmutableResources
-        state: State
+        state: State,
+        dependencies: string[]
+        originalModule: ModModule
     }
 )
 
-export type GenericModWrapper = (
-    ModWrapperCore
-    & {
-        readonly alias: string
-        readonly resources: object
-        state: object
-    }
-)
+export type GenericModWrapper = ModWrapper<string, object | undefined, object>
 
 export interface ModView extends GenericModWrapper {}
 
 export type LinkedMods<
-    EngineModules extends DependentMods,
+    EngineModules extends ModModules,
 > = (
     {
         [mod in EngineModules[number] as mod["alias"]]: (
@@ -108,86 +76,90 @@ export type LinkedMods<
 )
 
 export type EngineLinkedMods<
-    EngineModules extends DependentMods
+    EngineModules extends ModModules
 > = {
     mods: LinkedMods<EngineModules>
 }
 
-export type ShaheenEngine<
-    Dependencies extends DependentMods = [],
-> = (
-    EngineLinkedMods<Dependencies>
-    & InitializedEngineCore
-)
+export interface ModExtensions {}
 
-export type EnginePrimitives = Partial<PostInitializationCore>
-
-export type ModLifeCycleEvents<
-    Dependencies extends DependentMods,
-    Alias extends string,
-    ImmutableResources extends object | undefined,
-    State extends object
-> = {
-    onInit?: (
-        metadata: ModMetadata,
-        engineCore: ExtendedEngineCore, 
-    ) => Promise<EnginePrimitives | void> | EnginePrimitives | void,
+export type DependenciesDeclaration<
+    Dependencies extends ModModules
+> = Dependencies extends [] ? {} : {
+    // generics here made with the help of these answers:
+    // https://stackoverflow.com/questions/71918556/typescript-creating-object-type-from-readonly-array
+    // https://stackoverflow.com/questions/71931020/creating-a-readonly-array-from-another-readonly-array
     
-    onBeforeGameLoop?: (
-        engine: ShaheenEngine<[
-            ...Dependencies, 
-            ModData<Alias, ImmutableResources, State>
-        ]>,
-    ) => Promise<void> | void
-    
-    onExit?: (
-        engine: ShaheenEngine<[
-            ...Dependencies, 
-            ModData<Alias, ImmutableResources, State>
-        ]>,
-    ) => Promise<void> | void
+    readonly dependencies: {
+        [index in keyof Dependencies]: Dependencies[index] extends { alias: string }
+            ? Dependencies[index]["alias"]
+            : never
+    }
 }
 
-export type ModCore <
-    Dependencies extends DependentMods,
+export type ModDeclaration<
+    Dependencies extends ModModules,
     Alias extends string,
     ImmutableResources extends object | undefined,
     State extends object
 > = (
     DependenciesDeclaration<Dependencies> 
     & ModData<Alias, ImmutableResources, State>
-    & ModLifeCycleEvents<Dependencies, Alias, ImmutableResources, State>
 )
 
-export interface ModExtensions {}
+export type ShaheenEngine<
+    LinkedMods extends ModModules,
+> = (
+    EngineLinkedMods<LinkedMods>
+    & InitializedEngineCore
+)
+
+export type EnginePrimitives = Partial<PostInitializationCore>
+
+export type BeforeGameLoopEvent<
+    LinkedMods extends ModModules,
+> = (engine: ShaheenEngine<LinkedMods>) => Promise<void> | void
+
+export type InitEvent = (
+    metadata: ModMetadata,
+    engineCore: ExtendedEngineCore, 
+) => Promise<EnginePrimitives | void> | EnginePrimitives | void
+
+export type ExitEvent<LinkedMods extends ModModules> = BeforeGameLoopEvent<LinkedMods>
+
+export type ModLifeCycleEvents<
+    Dependencies extends ModModules,
+    Alias extends string,
+    ImmutableResources extends object | undefined,
+    State extends object
+> = {
+    onInit?: InitEvent
+    
+    onBeforeGameLoop?: BeforeGameLoopEvent<[
+        ...Dependencies, 
+        ModData<Alias, ImmutableResources, State>
+    ]>
+    
+    onExit?: ExitEvent<[
+        ...Dependencies, 
+        ModData<Alias, ImmutableResources, State>
+    ]>,
+}
+
 
 export type Mod<
-    Dependencies extends DependentMods,
+    Dependencies extends ModModules,
     Alias extends string,
     ImmutableResources extends object | undefined,
     State extends object
 > = (
-    ModCore<Dependencies, Alias, ImmutableResources, State>
+    ModDeclaration<Dependencies, Alias, ImmutableResources, State>
+    & ModLifeCycleEvents<Dependencies, Alias, ImmutableResources, State>
     & ModExtensions
 )
 
-export type EngineModules<T> = T extends Mod<
-    infer Dep,
-    infer Alias,
-    infer ImmutableResources,
-    infer State
-> ? [...Dep, ModData<Alias, ImmutableResources, State>] : never
-
-export type ModdedEngine<CurrentMod> = CurrentMod extends Mod<
-    infer Dep,
-    infer Alias,
-    infer ImmutableResources,
-    infer State
-> ? ShaheenEngine<[...Dep, ModData<Alias, ImmutableResources, State>]> : never
-
-
 export const mod = <
-    Dependencies extends DependentMods = []
+    Dependencies extends ModModules = []
 >() => ({
     create: <
         Alias extends string,
@@ -208,19 +180,53 @@ export type GenericMod = Mod<
     object
 >
 
-export type ModModule<
-    Alias extends string,
-    ImmutableResources extends object | undefined,
-    Dependencies extends DependentMods
-> = {
-    default: Mod<
-        Dependencies, 
-        Alias, 
-        ImmutableResources,
-        object
-    >
+export type ModModule<ExportedMod extends GenericMod = GenericMod> = {
+    default: ExportedMod
 }
 
-export type GenericModModule = {
-    default: GenericMod
-}
+// utility types
+export type InferEngine<CurrentMod> = ( 
+    CurrentMod extends Mod<
+        infer Dep,
+        infer Alias,
+        infer ImmutableResources,
+        infer State
+    > 
+        ? ShaheenEngine<[
+            ...Dep, 
+            ModData<Alias, ImmutableResources, State>
+        ]> 
+        : never
+)
+
+export type InferGameSystem<CurrentMod> = ( 
+    CurrentMod extends Mod<
+        infer Dep,
+        infer Alias,
+        infer ImmutableResources,
+        infer State
+    > 
+        ? (engine: ShaheenEngine<[
+            ...Dep, 
+            ModData<Alias, ImmutableResources, State>
+        ]>) => void
+        : never
+)
+
+export type InferBeforeGameLoopEvent<CurrentMod> = ( 
+    CurrentMod extends Mod<
+        infer Dep,
+        infer Alias,
+        infer ImmutableResources,
+        infer State
+    > 
+        ? BeforeGameLoopEvent<[
+            ...Dep, 
+            ModData<Alias, ImmutableResources, State>
+        ]> 
+        : never
+)
+
+export type InferExitEvent<CurrentMod> = (
+    InferBeforeGameLoopEvent<CurrentMod>
+)

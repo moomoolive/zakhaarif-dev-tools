@@ -1,6 +1,6 @@
 {
   "name": "zakhaarif-dev-tools",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "developer tools to help create extension & mods for zakhaarif",
   "type": "module",
   "scripts": {
